@@ -1,0 +1,76 @@
+---
+title: "EDA"
+author: "Maxwell Patterson"
+date: 2024-02-12
+---
+
+```{r}
+# Clear environment -----------
+rm(list=ls())
+```
+
+
+
+```{r, message=FALSE}
+# Install packages ----------
+library(dplyr)
+library(tidyverse)
+library(janitor)
+library(lubridate)
+library(forcats)
+```
+
+
+```{r}
+# Reading in raw data ----------
+sleeps_raw = read.csv(here::here('data/my_whoop_data_2024_02_12/sleeps.csv'))
+workouts_raw = read.csv(here::here('data/my_whoop_data_2024_02_12/workouts.csv'))
+journal_entries_raw = read.csv(here::here('data/my_whoop_data_2024_02_12/journal_entries.csv'))
+physiological_cycles_raw = read.csv(here::here('data/my_whoop_data_2024_02_12/physiological_cycles.csv'))
+```
+
+
+```{r}
+# Clean up the column names with janitor package ----------
+sleeps = sleeps_raw %>% 
+  janitor::clean_names()
+
+workouts = workouts_raw %>% 
+  janitor::clean_names()
+
+journals = journal_entries_raw %>% 
+  janitor::clean_names()
+
+phys_cycles = physiological_cycles_raw %>% 
+  janitor::clean_names()
+```
+
+
+```{r}
+# Data wrangling ----------
+
+# Wrangling 'sleeps' data
+
+
+# Wrangling 'workouts' data
+
+
+
+```
+
+
+```{r}
+# Exploratory visuals ----------
+activity_count = ggplot(workouts, aes(x = fct_infreq(activity_name))) +
+  geom_bar() +
+  theme_minimal() +
+  labs(title = "Number of Workouts by Activity Type",
+       x = "Activity Name",
+       y = "Count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+activity_count
+
+```
+
+
