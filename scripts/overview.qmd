@@ -1,15 +1,18 @@
 ---
-title: "EDA"
+title: "Whoop Intro"
 author: "Maxwell Patterson"
 date: 2024-02-12
 ---
+
+Whoop is a personal fitness tracker and health assistant that I have been using for just about a year now (with a few gaps when I was lazy and did not truly comprehend the impact it can have on my overall health). I will be conducting some statistical analyses on my very own data to better understand myself. 
+
+Selfishly, I think analyzing and understanding the `workout` data will motivate me to work possibly harder, but definitely for longer periods of time. It hasn't been super easy transitioning away from a team sports environment to a more personal workout routine, and there are days I miss being in as good of shape as I was during polo season. While I know this is unrealistic, I would like to get somewhat close. After all, I got the Whoop a few weeks after the season had ended as I knew it would be a good idea to make working out, and my overall health, a new kind of priority in my life.
+
 
 ```{r}
 # Clear environment -----------
 rm(list=ls())
 ```
-
-
 
 ```{r, message=FALSE}
 # Install packages ----------
@@ -17,7 +20,10 @@ library(dplyr)
 library(tidyverse)
 library(janitor)
 library(lubridate)
+library(ggridges)
 library(forcats)
+library(knitr)
+library(kableExtra)
 ```
 
 
@@ -60,8 +66,34 @@ phys_cycles = physiological_cycles_raw %>%
 
 
 ```{r}
-# Exploratory visuals ----------
-activity_count = ggplot(workouts, aes(x = fct_infreq(activity_name))) +
+ # EDA----------
+# `workouts` summary table
+workouts_summary_table <- workouts %>%
+  group_by(activity_name) %>%
+  summarise(
+    average_duration_min = mean(duration_min, na.rm = TRUE),
+    average_activity_strain = mean(activity_strain, na.rm = TRUE),
+    average_energy_burned_cal = mean(energy_burned_cal, na.rm = TRUE),
+    average_max_hr_bpm = mean(max_hr_bpm, na.rm = TRUE),
+    average_energy_burned_per_min = average_energy_burned_cal / average_duration_min,
+    average_hr_zone_1 = mean(hr_zone_1, na.rm = TRUE),
+    average_hr_zone_2 = mean(hr_zone_2, na.rm = TRUE),
+    average_hr_zone_3 = mean(hr_zone_3, na.rm = TRUE),
+    average_hr_zone_4 = mean(hr_zone_4, na.rm = TRUE),
+    average_hr_zone_5 = mean(hr_zone_5, na.rm = TRUE),
+    count = n()
+  ) %>%
+  arrange(desc(average_activity_strain))
+
+knitr::kable(workouts_summary_table)
+
+```
+
+
+```{r}
+# Exploratory `workouts` visuals ----------
+# Number of workouts by activity type
+activity_count_hist = ggplot(workouts, aes(x = fct_infreq(activity_name))) +
   geom_bar() +
   theme_minimal() +
   labs(title = "Number of Workouts by Activity Type",
@@ -69,7 +101,133 @@ activity_count = ggplot(workouts, aes(x = fct_infreq(activity_name))) +
        y = "Count") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-activity_count
+# Strain vs Duration scatter plot by activity type
+strain_vs_duration= ggplot(workouts_summary_table, aes(x = average_duration_min, y = average_activity_strain, size = count, color = activity_name)) +
+  geom_point(alpha = 0.7) +
+  theme_minimal() +
+  scale_size(range = c(5, 25), name = "Workout Count") +
+  labs(title = "Workout Duration vs. Strain by Activity Type",
+       x = "Average Duration (min)",
+       y = "Average Activity Strain",
+       color = "Activity Type") +
+  theme(legend.position = "right")
+
+
+# Reshape for plotting
+workouts_long_plt = workouts %>%
+  pivot_longer(cols = starts_with("hr_zone_"), names_to = "heart_rate_zone", values_to = "minutes") %>%
+  mutate(heart_rate_zone = factor(heart_rate_zone, levels = c("hr_zone_1", "hr_zone_2", "hr_zone_3", "hr_zone_4", "hr_zone_5"), labels = paste("Zone", 1:5)))
+
+hr_vs_activity = ggplot(workouts_long_plt, aes(x = activity_name, y = minutes, fill = heart_rate_zone)) +
+  geom_bar(stat = "identity", position = "stack") +
+  theme_minimal() +
+  labs(title = "Time Spent in Heart Rate Zones by Activity",
+       x = "Activity Type",
+       y = "Minutes in Zone",
+       fill = "HR Zone") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+energy_vs_activity = ggplot(workouts_summary_table, aes(x = reorder(activity_name, -average_energy_burned_cal), y = average_energy_burned_cal, fill = activity_name)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Average Energy Burned by Activity Type",
+       x = "Activity Type",
+       y = "Average Energy Burned (cal)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none")
+
+strain_vs_duration = ggplot(workouts_summary_table, aes(x = average_duration_min, y = average_activity_strain, size = average_energy_burned_per_min, color = activity_name)) +
+  geom_point(alpha = 0.7) +
+  scale_size(range = c(5, 25), name = "Avg Energy Burned/min") +  # Adjust the size scale
+  theme_minimal() +
+  labs(title = "Workout Duration vs. Strain by Activity Type",
+       x = "Average Duration (min)",
+       y = "Average Activity Strain",
+       color = "Activity Type",
+       size = "Avg Energy Burned/min") +  # Add label for size
+  theme(legend.position = "right")
+
+# Calculate energy burned per minute by activity
+workouts_summary_per_min <- workouts %>%
+  group_by(activity_name) %>%
+  summarise(
+    average_energy_burned_per_min = sum(energy_burned_cal, na.rm = TRUE) / sum(duration_min, na.rm = TRUE),
+    count = n()  # Count of workouts for each activity type
+  ) %>%
+  arrange(desc(average_energy_burned_per_min))
+
+# Energy burner per minute bar plot
+energy_burned_per_min_plot <- ggplot(workouts_summary_per_min, aes(x = reorder(activity_name, -average_energy_burned_per_min), y = average_energy_burned_per_min, fill = activity_name)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Average Energy Burned per Minute by Activity Type",
+       x = "Activity Type",
+       y = "Average Energy Burned per Minute") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none")
+
+workouts_long <- workouts %>%
+  pivot_longer(cols = starts_with("hr_zone_"), names_to = "heart_rate_zone", values_to = "minutes") %>%
+  mutate(heart_rate_zone = factor(heart_rate_zone, levels = c("hr_zone_1", "hr_zone_2", "hr_zone_3", "hr_zone_4", "hr_zone_5"), labels = paste("Zone", 1:5)))
+
+activity_counts <- workouts_long %>%
+  group_by(activity_name) %>%
+  summarise(count = n()) %>%
+  ungroup()
+
+workouts_long_with_counts <- merge(workouts_long, activity_counts, by = "activity_name")
+
+ggplot(workouts_long_with_counts, aes(x = energy_burned_cal, y = fct_reorder(activity_name, energy_burned_cal, .fun = median), fill = activity_name)) +
+  geom_density_ridges() +
+  geom_text(aes(x = Inf, label = count), hjust = 1, color = "black", size = 3) +
+  scale_fill_viridis_d() +
+  theme_ridges() +
+  labs(title = "Distribution of Energy Burned Across Activities",
+       x = "Energy Burned (Calories)",
+       y = "Activity Type")
+
+# Energy burned by activity ridge plot
+ggplot(workouts, aes(x = energy_burned_cal, y = activity_name, fill = activity_name)) +
+  ggridges::geom_density_ridges() +
+  theme_ridges() +
+  labs(title = "Distribution of Energy Burned Across Activities",
+       x = "Energy Burned (Calories)",
+       y = "Activity Type")
+
+
+
+```
+
+```{r}
+
+workout_counts <- workouts %>%
+  group_by(activity_name, day_of_week) %>%
+  summarise(workout_count = n(), .groups = 'drop') %>%
+  ungroup()
+
+workouts$day_of_week <- weekdays(as.Date(workouts$workout_start_time))
+
+workout_frequency <- workouts %>%
+  group_by(activity_name, day_of_week) %>%
+  summarise(count = n()) %>%
+  spread(key = day_of_week, value = count, fill = 0)
+
+ggplot(workout_frequency, aes(x = day_of_week, y = activity_name, fill = workout_counts)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "steelblue") +
+  theme_minimal() +
+  labs(title = "Workout Frequency by Day of Week and Activity Type",
+       x = "Day of Week",
+       y = "Activity Type")
+```
+
+
+```{r}
+workout_frequency_long <- tidyr::pivot_longer(workout_frequency, cols = -activity_name, names_to = "day_of_week", values_to = "workout_count")
+
+workout_frequency_long$day_of_week <- factor(workout_frequency_long$day_of_week, levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
+
+```
+
+```{r}
 
 ```
 
